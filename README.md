@@ -1,69 +1,150 @@
-# AI Investment Decision Agent — Final Take-Home Project
+# AI Investment Decision Agent
 
-## What this project answers
+## Project Overview
 
-**If a company deploys an AI agent, does the investment create incremental financial value?**
+The **AI Investment Decision Agent** is a financial decision-support tool built to answer a simple question:
 
-The project uses Wolters Kluwer's CCH Axcess Expert AI as the worked example.
+**Can an AI investment create incremental financial value for a company?**
 
-The key idea is simple:
+The project uses **Wolters Kluwer and CCH Axcess Expert AI** as the case study.
 
-**AI operating assumptions → incremental revenue/cost → EBIT → free cash flow → NPV / IRR / payback → investment decision**
+The project was completed in two stages.
 
-## Why the existing financial model matters
+### 1. Financial Modeling
 
-The detailed Wolters Kluwer workbook is the **finance foundation**. It establishes the company's baseline revenue, margins, cash flow, WACC, enterprise value and shares outstanding.
+The first step was to build a detailed financial model for Wolters Kluwer.
 
-This app does not try to replicate the entire workbook. Instead it isolates the incremental cash flows of one AI initiative. That avoids incorrectly claiming that all company growth is caused by AI.
+The model was used to:
 
-The original model architecture also separates:
-- **Deterministic math** — calculations must be auditable and reproducible.
-- **Judgment** — the analyst interprets the already-computed results and highlights the weakest assumption.
+* Analyze historical financial performance
+* Forecast future revenue and profitability
+* Forecast the income statement, balance sheet, and cash flow statement
+* Estimate free cash flow
+* Calculate WACC
+* Perform a DCF valuation
+* Estimate enterprise value and value per share
 
-## Main user inputs
+This created the financial baseline needed to evaluate the AI investment.
 
-The four inputs visible by default are:
+### 2. AI Investment Analysis
 
-1. 2031 AI adoption
-2. AI module ARPU
-3. AI benefit realization
-4. Platform & governance cost
+After establishing the company baseline, the model separately evaluates the incremental financial impact of **CCH Axcess Expert AI**.
 
-Advanced assumptions and tokenomics are available in expandable sections.
+The application looks at assumptions such as:
 
-## Main outputs
+* AI customer adoption
+* AI module ARPU
+* AI benefit realization
+* Customer retention improvement
+* Pricing improvement
+* AI development costs
+* Delivery and sales costs
+* Platform and governance costs
+* AI inference and token costs
 
-- Incremental AI NPV
-- IRR
-- Discounted payback
-- Cumulative ROI
-- Benefit / cost
-- Incremental value per share
-- AI NPV as % of enterprise value
-- Cash-flow graph
-- Adoption × ARPU sensitivity
-- Fund / Pilot / Do Not Scale recommendation
+These assumptions are converted into:
+
+**AI assumptions → incremental revenue and costs → EBIT → free cash flow → NPV / IRR / payback → investment decision**
+
+The purpose is not to assume that all Wolters Kluwer growth was caused by AI.
+
+Instead, the project asks:
+
+**If the expected benefits of this AI initiative are achieved, how much additional value could it create?**
+
+## Main User Inputs
+
+The four main inputs shown in the application are:
+
+1. **2031 AI adoption**
+2. **AI module ARPU**
+3. **AI benefit realization**
+4. **Platform and governance cost**
+
+Additional assumptions are available under advanced settings, including:
+
+* Starting adoption
+* Addressable customers
+* Customer growth
+* Churn reduction
+* Pricing uplift
+* AI development costs
+* Delivery costs
+* Sales and marketing costs
+* Token usage and inference costs
+
+## Main Outputs
+
+The application calculates:
+
+* Incremental AI NPV
+* IRR
+* Discounted payback
+* Cumulative ROI
+* Benefit-to-cost ratio
+* Incremental value per share
+* AI NPV as a percentage of enterprise value
+* Free cash flow over time
+* Adoption × ARPU sensitivity
+* Break-even scenarios
+* **Fund / Pilot / Do Not Scale** recommendation
+
+## Scenario Analysis
+
+The application also allows the user to test simple questions such as:
+
+* What if AI adoption is only 20%?
+* What if AI benefit realization falls to 80%?
+* What is the minimum ARPU required for positive NPV?
+* What level of adoption is required to break even?
+* What happens if AI inference costs increase?
+
+The financial calculations are performed by the deterministic model, while the decision layer helps interpret the results.
 
 ## Tokenomics
 
-Tokenomics is intentionally a supporting cost driver, not the whole case.
+Token costs are included as one part of the overall AI cost structure.
 
-The app uses:
+The model estimates:
 
-`cost per call = input tokens × input price + output tokens × output price`
+`cost per call = input token cost + output token cost`
 
-and then:
+and:
 
-`annual inference cost = subscribed firms × workflows per firm × calls per workflow × cost per call`
+`annual inference cost = subscribed firms × workflows per firm × model calls per workflow × cost per call`
 
-This cost flows into the same AI P&L and DCF as the other operating costs.
+These costs flow into the same AI financial model as development, platform, delivery, and other operating costs.
 
-## How to run
+## Overall Objective
+
+The project combines traditional financial modeling with AI investment analysis.
+
+The main question is:
+
+**Under what operating and commercial assumptions does an AI investment create incremental shareholder value?**
+
+## How to Run the Project
+
+Install the required packages:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Then start the Streamlit application:
+
+```bash
 streamlit run app.py
 ```
 
-The command opens the app in your browser at http://localhost:8501.
-Running `python app.py` will not work: Streamlit scripts need the Streamlit runtime to start the web server.
+The application will open in your browser, usually at:
+
+`http://localhost:8501`
+
+Do not run:
+
+```bash
+python app.py
+```
+
+The project should be started with the Streamlit command because Streamlit runs the web interface and local server.
