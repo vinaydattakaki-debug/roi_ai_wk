@@ -1,7 +1,7 @@
 from pathlib import Path
 import textwrap, zipfile, json, math, os
 
-out = Path(__file__).parent / "Wolters_Kluwer_AI_ROI"
+out = Path(__file__).resolve().parent / "Wolters_Kluwer_AI_ROI"
 out.mkdir(parents=True, exist_ok=True)
 
 model_py = r'''
@@ -197,10 +197,10 @@ def compute_model(drivers=None, account=None):
     }
 
 
-def break_even(driver_name, low, high, fixed_drivers=None, iterations=80):
+def break_even(driver_name, low, high, fixed_drivers=None, iterations=80, account=None):
     base = {} if fixed_drivers is None else dict(fixed_drivers)
-    low_result = compute_model({**base, driver_name: low})["npv"]
-    high_result = compute_model({**base, driver_name: high})["npv"]
+    low_result = compute_model({**base, driver_name: low}, account)["npv"]
+    high_result = compute_model({**base, driver_name: high}, account)["npv"]
 
     if high_result < 0:
         return None
@@ -210,7 +210,7 @@ def break_even(driver_name, low, high, fixed_drivers=None, iterations=80):
     lo, hi = low, high
     for _ in range(iterations):
         mid = (lo + hi) / 2.0
-        result = compute_model({**base, driver_name: mid})["npv"]
+        result = compute_model({**base, driver_name: mid}, account)["npv"]
         if result >= 0:
             hi = mid
         else:
@@ -303,49 +303,94 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.sidebar:
+    st.header("Investment assumptions")
+    st.caption("Change the few assumptions that matter most and run the investment case.")
+
+    adoption_end = st.slider("2031 AI adoption (%)", 10.0, 60.0, 34.0, 1.0)
+    st.caption("Base assumption: 34%")
+
+    arpu = st.number_input("AI module ARPU (€ / firm-year)", 5_000.0, 60_000.0, 25_000.0, 500.0)
+    st.caption("Annual AI revenue per subscribed firm")
+
+    benefit_realization = st.slider(
+        "AI benefit realization (%)", 50.0, 100.0, 100.0, 1.0,
+        help="A simple stress factor for technical effectiveness, accuracy and real-world benefit capture."
+    )
+    st.caption("Stress technical effectiveness and real-world benefit capture")
+
+    platform = st.number_input("Platform & governance cost (€m / year)", 0.0, 30.0, 5.0, 0.5)
+    st.caption("Annual run cost of the AI platform, security and oversight")
+
+    with st.expander("Advanced assumptions", expanded=True):
+        a1, a2 = st.columns(2)
+        wacc = a1.number_input(
+            "WACC (%)", 3.0, 20.0, float(ACCOUNT["wacc"]), 0.5,
+            help="Discount rate and investment hurdle. Feeds NPV, discounted payback and the fund / pilot verdict."
+        )
+        expansion = a2.number_input("Advisory expansion (%)", 0.0, 40.0, 15.0, 1.0)
+
+        a3, a4 = st.columns(2)
+        churn_bps = a3.number_input("Churn reduction (bps)", 0.0, 250.0, 100.0, 5.0)
+        price_bps = a4.number_input("Price uplift (bps)", 0.0, 200.0, 50.0, 5.0)
+
+        attribution = st.number_input("Benefits credited to AI (%)", 0.0, 100.0, 50.0, 5.0)
+
+        a5, a6 = st.columns(2)
+        adoption_start = a5.number_input("2026 adoption (%)", 0.5, 25.0, 4.0, 0.5)
+        firms = a6.number_input("Addressable firms", 100.0, 50_000.0, 10_000.0, 100.0)
+
+        firm_growth = st.number_input("Addressable-firm growth (%)", 0.0, 10.0, 3.0, 0.5)
+
+    with st.expander("Cost assumptions", expanded=True):
+        c1, c2 = st.columns(2)
+        dev_intensity = c1.number_input("Product development (% revenue)", 5.0, 20.0, 12.0, 0.5)
+        ai_share_dev = c2.number_input("AI share of development (%)", 0.0, 50.0, 8.0, 1.0)
+
+        c3, c4 = st.columns(2)
+        delivery_pct = c3.number_input("Delivery cost (% module revenue)", 0.0, 50.0, 15.0, 1.0)
+        sm_pct = c4.number_input("Sales & marketing (% module revenue)", 0.0, 60.0, 20.0, 1.0)
+
+        include_sunk = st.checkbox("Include €17.6m sunk cost", value=True)
+
+    with st.expander("Tokenomics", expanded=True):
+        st.caption(
+            "Optional. Token usage is treated as one operating-cost driver inside the same DCF."
+        )
+        include_token_cost = st.checkbox("Include inference cost", value=False)
+
+        t1, t2 = st.columns(2)
+        workflows_per_firm = t1.number_input("Workflows / firm / year", 0.0, 100_000.0, 500.0, 100.0)
+        calls_per_workflow = t2.number_input("Model calls / workflow", 1.0, 50.0, 4.0, 1.0)
+
+        t3, t4 = st.columns(2)
+        input_tokens = t3.number_input("Input tokens / call", 0.0, 1_000_000.0, 10_000.0, 1_000.0)
+        output_tokens = t4.number_input("Output tokens / call", 0.0, 1_000_000.0, 2_000.0, 500.0)
+
+        t5, t6 = st.columns(2)
+        input_price = t5.number_input("Input € / 1M tokens", 0.0, 100.0, 2.0, 0.5)
+        output_price = t6.number_input("Output € / 1M tokens", 0.0, 500.0, 10.0, 1.0)
+
+        preview_cost = token_cost_per_firm({
+            "workflows_per_firm": workflows_per_firm,
+            "calls_per_workflow": calls_per_workflow,
+            "input_tokens_per_call": input_tokens,
+            "output_tokens_per_call": output_tokens,
+            "input_price_per_m": input_price,
+            "output_price_per_m": output_price,
+        })
+        st.caption(
+            f"Estimated inference cost is €{preview_cost:,.2f} per subscribed firm-year. "
+            + ("Currently included in the DCF." if include_token_cost
+               else "Currently excluded from the DCF.")
+        )
+
 top1, top2, top3 = st.columns(3)
 top1.metric("T&A revenue, 2025A", "€1,660m")
 top2.metric("Enterprise value anchor", "€30.16bn")
-top3.metric("WACC / investment hurdle", "8.0%")
+top3.metric("WACC / investment hurdle", f"{wacc:.1f}%")
 
 st.divider()
-
-with st.sidebar:
-    st.header("Investment assumptions")
-    st.caption("Keep the main case simple. Advanced variables are available below.")
-
-    adoption_end = st.slider("2031 AI adoption", 10.0, 60.0, 34.0, 1.0)
-    arpu = st.number_input("AI module ARPU (€ / firm-year)", 5_000.0, 60_000.0, 25_000.0, 500.0)
-    benefit_realization = st.slider(
-        "AI benefit realization", 50.0, 100.0, 100.0, 1.0,
-        help="A simple stress factor for technical effectiveness, accuracy and real-world benefit capture."
-    )
-    platform = st.number_input("Platform & governance (€m / year)", 0.0, 30.0, 5.0, 0.5)
-
-    with st.expander("Advanced commercial assumptions"):
-        adoption_start = st.number_input("2026 adoption (%)", 0.5, 25.0, 4.0, 0.5)
-        firms = st.number_input("Addressable firms", 100.0, 50_000.0, 10_000.0, 100.0)
-        firm_growth = st.number_input("Addressable-firm growth (%)", 0.0, 10.0, 3.0, 0.5)
-        expansion = st.number_input("Advisory expansion (%)", 0.0, 40.0, 15.0, 1.0)
-        churn_bps = st.number_input("Churn reduction (bps)", 0.0, 250.0, 100.0, 5.0)
-        price_bps = st.number_input("Price uplift (bps)", 0.0, 200.0, 50.0, 5.0)
-        attribution = st.number_input("Retention / pricing credited to AI (%)", 0.0, 100.0, 50.0, 5.0)
-
-    with st.expander("Cost assumptions"):
-        dev_intensity = st.number_input("Product development (% revenue)", 5.0, 20.0, 12.0, 0.5)
-        ai_share_dev = st.number_input("AI share of development (%)", 0.0, 50.0, 8.0, 1.0)
-        delivery_pct = st.number_input("Delivery cost (% module revenue)", 0.0, 50.0, 15.0, 1.0)
-        sm_pct = st.number_input("Sales & marketing (% module revenue)", 0.0, 60.0, 20.0, 1.0)
-        include_sunk = st.checkbox("Include €17.6m sunk cost", value=True)
-
-    with st.expander("Tokenomics"):
-        include_token_cost = st.checkbox("Include inference cost in DCF", value=False)
-        workflows_per_firm = st.number_input("Workflows / firm / year", 0.0, 100_000.0, 500.0, 100.0)
-        calls_per_workflow = st.number_input("Model calls / workflow", 1.0, 50.0, 4.0, 1.0)
-        input_tokens = st.number_input("Input tokens / call", 0.0, 1_000_000.0, 10_000.0, 1_000.0)
-        output_tokens = st.number_input("Output tokens / call", 0.0, 1_000_000.0, 2_000.0, 500.0)
-        input_price = st.number_input("Input price / 1M tokens (€)", 0.0, 100.0, 2.0, 0.5)
-        output_price = st.number_input("Output price / 1M tokens (€)", 0.0, 500.0, 10.0, 1.0)
 
 drivers = {
     "adoption_start": adoption_start,
@@ -373,7 +418,10 @@ drivers = {
     "output_price_per_m": output_price,
 }
 
-result = compute_model(drivers)
+account = dict(ACCOUNT)
+account["wacc"] = wacc
+
+result = compute_model(drivers, account)
 verdict, tone, headline = decision_for(result)
 
 tab1, tab2, tab3, tab4 = st.tabs(
@@ -475,7 +523,7 @@ with tab2:
             scenario = dict(drivers)
             scenario["adoption_end"] = 34.0 * mult
             scenario["arpu"] = a
-            row[f"€{a/1000:.1f}K ARPU"] = compute_model(scenario)["npv"]
+            row[f"€{a/1000:.1f}K ARPU"] = compute_model(scenario, account)["npv"]
         sens_rows.append(row)
     sens_df = pd.DataFrame(sens_rows)
     st.dataframe(sens_df.style.format({c: "{:.1f}" for c in sens_df.columns[1:]}), use_container_width=True, hide_index=True)
@@ -510,7 +558,7 @@ with tab3:
 
         if "break-even" in ql and "arpu" in ql:
             fixed = dict(drivers)
-            be = break_even("arpu", 5_000.0, 100_000.0, fixed_drivers=fixed)
+            be = break_even("arpu", 5_000.0, 100_000.0, fixed_drivers=fixed, account=account)
             if be is None:
                 answer = "The model does not reach positive NPV within the tested ARPU range."
             else:
@@ -521,7 +569,7 @@ with tab3:
 
         elif ("minimum" in ql or "break-even" in ql) and "adoption" in ql:
             fixed = dict(drivers)
-            be = break_even("adoption_end", 1.0, 90.0, fixed_drivers=fixed)
+            be = break_even("adoption_end", 1.0, 90.0, fixed_drivers=fixed, account=account)
             if be is None:
                 answer = "The model does not reach positive NPV within the tested adoption range."
             else:
@@ -549,7 +597,7 @@ with tab3:
                 scenario["input_price_per_m"] *= 2
                 scenario["output_price_per_m"] *= 2
 
-            scenario_result = compute_model(scenario)
+            scenario_result = compute_model(scenario, account)
             sv, _, _ = decision_for(scenario_result)
             payback_txt = (
                 "> horizon"
@@ -696,7 +744,16 @@ Running `python app.py` will not work: Streamlit scripts need the Streamlit runt
 """
 
 # --- the step that was missing: actually write the files to disk ---
+config_toml = """[theme]
+base = "light"
+primaryColor = "#2f766f"
+backgroundColor = "#f7f9fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#172033"
+"""
+
 files = {
+    ".streamlit/config.toml": config_toml,
     "model.py": model_py.lstrip(),
     "app.py": app_py.lstrip(),
     "requirements.txt": requirements,
@@ -704,7 +761,9 @@ files = {
 }
 
 for name, text in files.items():
-    (out / name).write_text(text, encoding="utf-8")
+    target = out / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
 
 with zipfile.ZipFile(out.parent / "AI_Investment_Decision_Agent_Final.zip", "w", zipfile.ZIP_DEFLATED) as zf:
     for name in files:
